@@ -1,0 +1,32 @@
+#!/bin/sh
+# unbranded-commits: a global Git commit-msg hook
+#
+# Replaces AI vendor trailers with one neutral trailer:
+# Assisted-by: AI. Commits without a vendor trailer are untouched.
+# Prefer a warning instead? Use commit-msg-warn.
+
+COMMIT_MSG_FILE="$1"
+
+# Vendor names to match. Add or remove names as tools change.
+AI_PATTERN="(Claude|Copilot|Cursor|Windsurf|Gemini|Antigravity"
+AI_PATTERN="${AI_PATTERN}|ChatGPT|OpenAI|Codex|Aider|Cline|Roo"
+AI_PATTERN="${AI_PATTERN}|OpenCode)"
+
+# Branded co-author lines, plus vendor-only trailers. Names must
+# be whole words, so a human "Brooke Rooney" isn't matched by Roo.
+W="(^|[^[:alnum:]])${AI_PATTERN}([^[:alnum:]]|$)"
+TRAILER_REGEX="^((Co-authored-by|Made-with):.*${W}|Claude-Session:)"
+
+# No vendor trailer? Nothing to do.
+grep -qiE "$TRAILER_REGEX" "$COMMIT_MSG_FILE" || exit 0
+
+# Remove the vendor lines. "|| true": grep exits 1 when no lines
+# are left, which must not abort the commit.
+{ grep -viE "$TRAILER_REGEX" "$COMMIT_MSG_FILE" || true; } \
+  > "$COMMIT_MSG_FILE.tmp"
+mv "$COMMIT_MSG_FILE.tmp" "$COMMIT_MSG_FILE"
+
+# Let Git add the trailer to the existing trailer block, so lines
+# such as Signed-off-by stay intact. No duplicates.
+git interpret-trailers --in-place --if-exists doNothing \
+  --trailer "Assisted-by: AI" "$COMMIT_MSG_FILE"

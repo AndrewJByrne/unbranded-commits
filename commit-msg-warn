@@ -1,0 +1,26 @@
+#!/bin/sh
+# unbranded-commits (warn version): a global Git commit-msg hook
+#
+# Stops any commit that carries an AI vendor trailer and shows the
+# line, so you decide what to do. Nothing is rewritten.
+# Prefer an automatic fix instead? Use commit-msg.
+
+COMMIT_MSG_FILE="$1"
+
+# Vendor names to match. Add or remove names as tools change.
+AI_PATTERN="(Claude|Copilot|Cursor|Windsurf|Gemini|Antigravity"
+AI_PATTERN="${AI_PATTERN}|ChatGPT|OpenAI|Codex|Aider|Cline|Roo"
+AI_PATTERN="${AI_PATTERN}|OpenCode)"
+
+# Branded co-author lines, plus vendor-only trailers. Names must
+# be whole words, so a human "Brooke Rooney" isn't matched by Roo.
+W="(^|[^[:alnum:]])${AI_PATTERN}([^[:alnum:]]|$)"
+TRAILER_REGEX="^((Co-authored-by|Made-with):.*${W}|Claude-Session:)"
+
+# No vendor trailer? Nothing to do.
+grep -qiE "$TRAILER_REGEX" "$COMMIT_MSG_FILE" || exit 0
+
+echo "unbranded-commits: vendor trailer found:" >&2
+grep -iE "$TRAILER_REGEX" "$COMMIT_MSG_FILE" >&2
+echo "Remove it, or turn off attribution in that tool." >&2
+exit 1  # change to "exit 0" to warn but let the commit through
